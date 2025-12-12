@@ -1,59 +1,58 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Gemini Dictate - Settings</title>
   <link rel="stylesheet" href="styles.css">
 </head>
+
 <body>
   <div class="container">
     <header>
       <h1>🎤 Gemini Dictate</h1>
       <p class="subtitle">Speech-to-text transcription powered by Gemini AI</p>
     </header>
-    
+
     <main>
       <section class="card">
         <h2>API Configuration</h2>
-        
+
         <div class="form-group">
           <label for="apiKey">Gemini API Key</label>
-          <input 
-            type="password" 
-            id="apiKey" 
-            placeholder="Enter your Gemini API key"
-            autocomplete="off"
-          >
+          <input type="password" id="apiKey" placeholder="Enter your Gemini API key" autocomplete="off">
           <p class="help-text">
-            Don't have an API key? 
+            Don't have an API key?
             <a href="https://makersuite.google.com/app/apikey" target="_blank">Get one here</a>
           </p>
         </div>
-        
+
         <div class="button-group">
           <button id="saveBtn" class="btn btn-primary">Save API Key</button>
           <button id="testBtn" class="btn btn-secondary">Test Connection</button>
         </div>
-        
+
         <div id="status" class="status hidden"></div>
       </section>
-      
+
       <section class="card">
         <h2>How to Use</h2>
         <ol class="instructions">
           <li>Click on any text input field on a webpage</li>
-          <li>Press <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>S</kbd> (or <kbd>Cmd</kbd> + <kbd>Shift</kbd> + <kbd>S</kbd> on Mac)</li>
+          <li>Press <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>S</kbd> (or <kbd>Cmd</kbd> + <kbd>Shift</kbd> +
+            <kbd>S</kbd> on Mac)
+          </li>
           <li>Start speaking - your words will be transcribed in real-time</li>
           <li>Click away or switch tabs to stop dictation</li>
         </ol>
-        
+
         <p class="help-text">
-          You can customize the keyboard shortcut in 
+          You can customize the keyboard shortcut in
           <a href="chrome://extensions/shortcuts" target="_blank">Chrome's extension shortcuts</a>
         </p>
       </section>
-      
+
       <section class="card">
         <h2>Privacy & Permissions</h2>
         <ul class="privacy-list">
@@ -64,13 +63,14 @@
         </ul>
       </section>
     </main>
-    
+
     <footer>
       <p>Made with ❤️ using Gemini AI</p>
     </footer>
   </div>
-  
+
   <script src="gemini-client.js"></script>
   <script src="options.js"></script>
 </body>
+
 </html>

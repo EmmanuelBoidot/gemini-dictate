@@ -26,11 +26,53 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     });
     return true; // Keep message channel open for async response
   }
-  
+
   if (request.action === 'log') {
     console.log('[Content Script]:', request.message);
   }
+
+  // Proxy Gemini API requests through offscreen document
+  if (request.action === 'gemini-transcribe') {
+    console.log('Background: Received transcribe request');
+
+    // Ensure offscreen document exists
+    ensureOffscreenDocument().then(() => {
+      console.log('Background: Forwarding to offscreen document');
+      // Forward the request to the offscreen document
+      chrome.runtime.sendMessage(request, (response) => {
+        console.log('Background: Got response from offscreen:', response);
+        sendResponse(response);
+      });
+    }).catch(error => {
+      console.error('Background: Failed to create offscreen document:', error);
+      sendResponse({ success: false, error: error.message });
+    });
+
+    return true; // Keep message channel open
+  }
 });
+
+// Ensure offscreen document is created
+async function ensureOffscreenDocument() {
+  // Check if offscreen document already exists
+  const existingContexts = await chrome.runtime.getContexts({
+    contextTypes: ['OFFSCREEN_DOCUMENT'],
+    documentUrls: [chrome.runtime.getURL('offscreen.html')]
+  });
+
+  if (existingContexts.length > 0) {
+    return; // Already exists
+  }
+
+  // Create offscreen document
+  await chrome.offscreen.createDocument({
+    url: 'offscreen.html',
+    reasons: ['AUDIO_PLAYBACK'], // Using AUDIO_PLAYBACK as the reason
+    justification: 'Making Gemini API calls for audio transcription'
+  });
+
+  console.log('Background: Created offscreen document');
+}
 
 // Handle extension installation
 chrome.runtime.onInstalled.addListener((details) => {

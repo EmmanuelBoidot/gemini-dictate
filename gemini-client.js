@@ -80,60 +80,48 @@ class GeminiClient {
                     if (onProcessing) onProcessing();
 
                     try {
-                        const response = await fetch(
-                            `${this.baseUrl}/models/gemini-2.5-flash:generateContent?key=${this.apiKey}`,
-                            {
-                                method: 'POST',
-                                headers: {
-                                    'Content-Type': 'application/json',
-                                },
-                                body: JSON.stringify({
-                                    contents: [{
-                                        parts: [
-                                            {
-                                                inline_data: {
-                                                    mime_type: "audio/pcm;rate=16000",
-                                                    data: base64Audio
-                                                }
-                                            }
-                                        ]
-                                    }],
-                                    generationConfig: {
-                                        temperature: 0.1,
-                                        topP: 0.8,
-                                        topK: 10
-                                    }
-                                })
-                            }
-                        );
+                        console.log('Sending request to background script...');
 
-                        if (!response.ok) {
-                            const errorData = await response.json();
+                        // Send request through background script to avoid content script fetch restrictions
+                        const response = await chrome.runtime.sendMessage({
+                            action: 'gemini-transcribe',
+                            apiKey: this.apiKey,
+                            audioBase64: base64Audio,
+                            systemInstruction: "You are a perfect and accurate note taker. Transcribe the audio exactly as spoken, fixing minor stutters and hesitations but preserving the speaker's phrasing and meaning. Return only the transcribed text, nothing else. Do not add commentary, explanations, or descriptions."
+                        });
 
-                            // Handle rate limiting specifically
-                            if (response.status === 429) {
-                                console.warn('Rate limit hit. Waiting before retry...');
-                                // Don't call onError, just skip this chunk and continue
-                                continue;
-                            }
+                        console.log('Background script response:', response);
 
-                            throw new Error(`API error: ${errorData.error?.message || response.statusText}`);
+                        if (!response.success) {
+                            throw new Error(response.error || 'Unknown error from background script');
                         }
 
-                        const data = await response.json();
-                        console.log('Gemini response:', data);
+                        console.log('Gemini response data:', JSON.stringify(response.data, null, 2));
 
-                        const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-
-                        if (text && text.trim()) {
-                            console.log('Transcribed text:', text.trim());
-                            onTranscript(text.trim());
+                        if (response.text && response.text.trim()) {
+                            console.log('Transcribed text:', response.text);
+                            onTranscript(response.text);
                         } else {
-                            console.log('No text in response');
+                            console.log('No text in response. Full response structure:', {
+                                hasCandidates: !!response.data.candidates,
+                                candidatesLength: response.data.candidates?.length,
+                                firstCandidate: response.data.candidates?.[0],
+                                promptFeedback: response.data.promptFeedback
+                            });
                         }
                     } catch (error) {
                         console.error('Gemini API error:', error);
-                        onError(error);
+                        console.error('Error name:', error.name);
+                        console.error('Error message:', error.message);
+                        console.error('Error stack:', error.stack);
+
+                        // Check for common error types
+                        if (error.name === 'TypeError' && error.message.includes('fetch')) {
+                            console.error('Network error: Failed to fetch. This could be a CORS issue or network connectivity problem.');
+                        }
+
+                        // Don't stop the loop on errors, just log them
+                        // onError(error); // Commenting this out to prevent stopping
                     }
                 }
             };
