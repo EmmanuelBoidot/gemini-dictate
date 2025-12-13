@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Test Google Chirp 3 API</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            max-width: 800px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+        }
+
+        .card {
+            border: 1px solid #ccc;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+        }
+
+        button {
+            padding: 0.5rem 1rem;
+            cursor: pointer;
+            background: #4285f4;
+            color: white;
+            border: none;
+            border-radius: 4px;
+        }
+
+        button:hover {
+            background: #3367d6;
+        }
+
+        pre {
+            background: #f5f5f5;
+            padding: 1rem;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+
+        .input-group {
+            margin-bottom: 1rem;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: bold;
+        }
+
+        input,
+        select {
+            width: 100%;
+            padding: 0.5rem;
+            box-sizing: border-box;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Test Google Chirp 3 API (STT V2)</h1>
+
+    <div class="card">
+        <div class="input-group">
+            <label>API Key</label>
+            <input type="password" id="apiKey" placeholder="AIza...">
+        </div>
+        <div class="input-group">
+            <label>Project ID</label>
+            <input type="text" id="projectId" placeholder="my-project-id">
+        </div>
+        <div class="input-group">
+            <label>Region</label>
+            <select id="region">
+                <option value="global" selected>global</option>
+                <option value="us">us (US Multi-region)</option>
+                <option value="us-central1">us-central1</option>
+                <option value="europe-west4">europe-west4</option>
+            </select>
+        </div>
+        <div class="input-group">
+            <label>Recognizer ID</label>
+            <input type="text" id="recognizerId" value="_">
+        </div>
+        <button onclick="testChirp()">Test Chirp 3 (with sample audio)</button>
+    </div>
+
+    <div class="card">
+        <h3>Output:</h3>
+        <pre id="output">Ready to test...</pre>
+    </div>
+
+    <script>
+        async function testChirp() {
+            const apiKey = document.getElementById('apiKey').value;
+            const projectId = document.getElementById('projectId').value;
+            const region = document.getElementById('region').value;
+            const recognizerId = document.getElementById('recognizerId').value;
+            const output = document.getElementById('output');
+
+            if (!apiKey || !projectId || !recognizerId) {
+                output.textContent = 'Error: Missing credentials';
+                return;
+            }
+
+            output.textContent = 'Generating sample audio...';
+
+            // Generate 1 second of silence (16kHz mono)
+            const sampleRate = 16000;
+            const duration = 1;
+            const numSamples = sampleRate * duration;
+            const buffer = new Float32Array(numSamples);
+
+            // Convert to 16-bit PCM
+            const int16Array = new Int16Array(numSamples);
+            for (let i = 0; i < numSamples; i++) {
+                int16Array[i] = 0; // Silence
+            }
+
+            const binary = String.fromCharCode(...new Uint8Array(int16Array.buffer));
+            const base64Audio = btoa(binary);
+
+            output.textContent += `\nCreated ${numSamples} samples (${duration}s)`;
+            output.textContent += `\nBase64 length: ${base64Audio.length}`;
+            output.textContent += `\n\nSending request to: https://speech.googleapis.com/v2/projects/${projectId}/locations/${region}/recognizers/${recognizerId}:recognize`;
+
+            try {
+                const url = `https://speech.googleapis.com/v2/projects/${projectId}/locations/${region}/recognizers/${recognizerId}:recognize?key=${apiKey}`;
+
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        config: {
+                            autoDecodingConfig: {},
+                            model: "chirp"
+                        },
+                        content: base64Audio
+                    })
+                });
+
+                output.textContent += `\nStatus: ${response.status}`;
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    output.textContent += `\nError: ${errorText}`;
+                    return;
+                }
+
+                const data = await response.json();
+                output.textContent += `\nResponse:\n${JSON.stringify(data, null, 2)}`;
+
+            } catch (error) {
+                output.textContent += `\nException: ${error.message}`;
+            }
+        }
+    </script>
+</body>
+
+</html>

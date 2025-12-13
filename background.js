@@ -32,8 +32,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   // Proxy Gemini API requests through offscreen document
-  if (request.action === 'gemini-transcribe') {
-    console.log('Background: Received transcribe request');
+  if (request.action === 'gemini-transcribe' || request.action === 'chirp-transcribe') {
+    console.log(`Background: Received ${request.action} request`);
 
     // Ensure offscreen document exists
     ensureOffscreenDocument().then(() => {

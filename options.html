@@ -54,6 +54,95 @@
       </section>
 
       <section class="card">
+        <h2>Transcription Engine</h2>
+        <div class="form-group">
+          <div class="radio-group">
+            <label class="radio-option" id="geminiOption">
+              <input type="radio" name="engine" value="gemini" id="engineGemini">
+              <div class="radio-content">
+                <strong>Gemini AI Transcription</strong>
+                <p class="help-text">Advanced AI-powered transcription with automatic cleanup of stutters and
+                  hesitations. Requires API key.</p>
+              </div>
+            </label>
+
+            <label class="radio-option" id="chirpOption">
+              <input type="radio" name="engine" value="chirp" id="engineChirp">
+              <div class="radio-content">
+                <strong>Google Chirp 3 (Cloud Speech-to-Text V2)</strong>
+                <p class="help-text">High-accuracy multilingual model. Requires Google Cloud Project & Recognizer.</p>
+              </div>
+            </label>
+          </div>
+
+          <p class="help-text" id="geminiDisabledNote" style="display: none; color: #f44336; margin-top: 10px;">
+            ⚠️ Gemini transcription requires an API key. Please save your API key above to enable this option.
+          </p>
+
+          <!-- Chirp Settings (Hidden by default) -->
+          <div id="chirpSettings"
+            style="display: none; margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px; border: 1px solid #e0e0e0;">
+            <h3>Chirp 3 Configuration</h3>
+            <p class="help-text" style="margin-bottom: 15px;">
+              Requires a Google Cloud Project with Speech-to-Text API enabled and a V2 Recognizer resource.
+            </p>
+
+            <div class="form-group">
+              <label for="chirpProjectId">Google Cloud Project ID</label>
+              <input type="text" id="chirpProjectId" placeholder="e.g., my-project-123">
+            </div>
+
+            <div class="form-group">
+              <label for="chirpRegion">Region</label>
+              <select id="chirpRegion" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px;">
+                <option value="global" selected>global</option>
+                <option value="us">us (US Multi-region)</option>
+                <option value="us-central1">us-central1 (Iowa)</option>
+                <option value="europe-west4">europe-west4 (Netherlands)</option>
+                <option value="asia-southeast1">asia-southeast1 (Singapore)</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="chirpRecognizerId">Recognizer ID</label>
+              <input type="text" id="chirpRecognizerId" placeholder="e.g., _ or my-recognizer" value="_">
+              <p class="help-text">Use "_" for default configuration, or a specific Recognizer ID.</p>
+            </div>
+
+            <div class="form-group">
+              <label>Authentication Method</label>
+              <div class="radio-group" style="margin-bottom: 10px;">
+                <label class="radio-option">
+                  <input type="radio" name="chirpAuthMethod" value="apiKey" checked>
+                  <div class="radio-content">API Key</div>
+                </label>
+                <label class="radio-option">
+                  <input type="radio" name="chirpAuthMethod" value="serviceAccount">
+                  <div class="radio-content">Service Account JSON</div>
+                </label>
+              </div>
+            </div>
+
+            <div id="chirpApiKeySection">
+              <div class="form-group">
+                <label for="chirpApiKey">Google Cloud API Key</label>
+                <input type="password" id="chirpApiKey" placeholder="Leave empty to use Gemini API Key">
+              </div>
+            </div>
+
+            <div id="chirpServiceAccountSection" style="display: none;">
+              <div class="form-group">
+                <label for="serviceAccountFile">Service Account JSON File</label>
+                <input type="file" id="serviceAccountFile" accept=".json">
+                <p class="help-text">Upload the JSON key file you downloaded from Google Cloud Console.</p>
+              </div>
+              <div id="serviceAccountStatus" style="margin-top: 5px; font-size: 0.9em;"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
         <h2>Privacy & Permissions</h2>
         <ul class="privacy-list">
           <li>🎤 <strong>Microphone:</strong> Required to capture your voice for transcription</li>
