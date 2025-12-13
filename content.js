@@ -165,9 +165,11 @@ async function startDictation() {
  * Start Gemini-based dictation
  */
 async function startGeminiDictation(apiKey) {
+    console.log('[Gemini Dictate] Initializing Gemini-based dictation...');
     try {
         // Request microphone access
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        console.log('[Gemini Dictate] Microphone access granted for Gemini.');
 
         isActive = true;
         window.dictationTarget = currentInput;
@@ -177,6 +179,7 @@ async function startGeminiDictation(apiKey) {
 
         // Create Gemini client
         const geminiClient = new GeminiClient(apiKey);
+        console.log('[Gemini Dictate] GeminiClient initialized.');
 
         // Start streaming audio to Gemini
         const controller = await geminiClient.streamAudio(
@@ -184,12 +187,13 @@ async function startGeminiDictation(apiKey) {
             // onTranscript callback
             (text) => {
                 if (window.dictationTarget && text) {
+                    console.log('[Gemini Dictate] Gemini - Transcript received:', text);
                     insertTextToTarget(window.dictationTarget, text + ' ');
                 }
             },
             // onError callback
             (error) => {
-                console.error('Gemini transcription error:', error);
+                console.error('[Gemini Dictate] Gemini transcription error:', error);
                 // Don't stop on errors, just log them
             },
             // onProcessing callback

@@ -57,6 +57,14 @@
         <h2>Transcription Engine</h2>
         <div class="form-group">
           <div class="radio-group">
+            <label class="radio-option">
+              <input type="radio" name="engine" value="chrome" checked>
+              <div class="radio-content">
+                <strong>Chrome Web Speech API (Default)</strong>
+                <p class="help-text">Standard browser-based transcription. Fast and free, but less accurate.</p>
+              </div>
+            </label>
+
             <label class="radio-option" id="geminiOption">
               <input type="radio" name="engine" value="gemini" id="engineGemini">
               <div class="radio-content">
