@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-EchoFlow POC - Voice to Text with Gemini
+EchoFlow POC - Voice to Text with Chirp 3 + Gemini Pro
 
 Flow:
 1. Hold Right Ctrl to start recording
-2. Audio chunked every 5s → parallel STT via Gemini Flash
+2. Audio chunked every 5s → parallel STT via Google Chirp 3
 3. Release Right Ctrl → Gemini Pro aggregates all transcripts → print
 """
 
@@ -14,11 +14,13 @@ import threading
 import time
 import base64
 import io
+import json
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import numpy as np
 import sounddevice as sd
 from pynput import keyboard
+import requests
 import google.generativeai as genai
 
 # Config
@@ -27,20 +29,28 @@ CHANNELS = 1
 CHUNK_DURATION = 5  # seconds
 TRIGGER_KEY = keyboard.Key.ctrl_r  # Right Ctrl - hold to talk
 
-# Gemini models
-STT_MODEL = "gemini-2.0-flash-exp"  # Fast model for chunk transcription
+# Models
 AGGREGATION_MODEL = "gemini-2.5-pro-preview-06-05"  # Pro model for final aggregation
+
+# Chirp 3 config (from environment)
+CHIRP_PROJECT_ID = os.environ.get("GOOGLE_CLOUD_PROJECT")
+CHIRP_REGION = os.environ.get("CHIRP_REGION", "us-central1")
+CHIRP_RECOGNIZER = os.environ.get("CHIRP_RECOGNIZER", "_")  # "_" for default
 
 # State
 is_recording = False
 audio_buffer = []
 audio_queue = queue.Queue()
-transcript_results = {}  # chunk_id -> transcript
+transcript_results = {}
 chunk_counter = 0
 executor = ThreadPoolExecutor(max_workers=5)
 futures = []
 chunk_timer = None
 buffer_lock = threading.Lock()
+
+# Auth
+google_access_token = None
+token_expiry = 0
 
 
 def init_gemini():
@@ -51,44 +61,86 @@ def init_gemini():
     genai.configure(api_key=api_key)
 
 
-def audio_to_base64_wav(audio_data: np.ndarray, sample_rate: int) -> str:
-    """Convert numpy audio array to base64-encoded WAV."""
-    import wave
+def get_access_token():
+    """Get Google Cloud access token using application default credentials."""
+    global google_access_token, token_expiry
 
-    # Convert float32 to int16
-    audio_int16 = (audio_data * 32767).astype(np.int16)
+    # Return cached token if still valid
+    if google_access_token and time.time() < token_expiry - 60:
+        return google_access_token
 
-    # Write to WAV in memory
-    buffer = io.BytesIO()
-    with wave.open(buffer, 'wb') as wav_file:
-        wav_file.setnchannels(CHANNELS)
-        wav_file.setsampwidth(2)  # 16-bit
-        wav_file.setframerate(sample_rate)
-        wav_file.writeframes(audio_int16.tobytes())
-
-    buffer.seek(0)
-    return base64.b64encode(buffer.read()).decode('utf-8')
-
-
-def transcribe_chunk(chunk_id: int, audio_data: np.ndarray) -> tuple[int, str]:
-    """Transcribe a single audio chunk using Gemini Flash."""
+    # Try to get token from gcloud
     try:
-        audio_b64 = audio_to_base64_wav(audio_data, SAMPLE_RATE)
-
-        model = genai.GenerativeModel(STT_MODEL)
-        response = model.generate_content([
-            {
-                "mime_type": "audio/wav",
-                "data": audio_b64
-            },
-            "Transcribe this audio exactly as spoken. Return only the transcription, nothing else. If there is no speech, return empty string."
-        ])
-
-        transcript = response.text.strip()
-        print(f"  [Chunk {chunk_id}] STT complete: {transcript[:50]}..." if len(transcript) > 50 else f"  [Chunk {chunk_id}] STT complete: {transcript}")
-        return (chunk_id, transcript)
+        import subprocess
+        result = subprocess.run(
+            ["gcloud", "auth", "print-access-token"],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        google_access_token = result.stdout.strip()
+        token_expiry = time.time() + 3600  # Assume 1 hour validity
+        return google_access_token
     except Exception as e:
-        print(f"  [Chunk {chunk_id}] STT error: {e}")
+        raise ValueError(f"Failed to get access token. Run 'gcloud auth login' first. Error: {e}")
+
+
+def audio_to_base64_pcm(audio_data: np.ndarray) -> str:
+    """Convert numpy audio array to base64-encoded 16-bit PCM."""
+    # Convert float32 [-1, 1] to int16
+    audio_int16 = (audio_data * 32767).astype(np.int16)
+    return base64.b64encode(audio_int16.tobytes()).decode('utf-8')
+
+
+def transcribe_chunk_chirp3(chunk_id: int, audio_data: np.ndarray) -> tuple[int, str]:
+    """Transcribe a single audio chunk using Google Chirp 3."""
+    try:
+        audio_b64 = audio_to_base64_pcm(audio_data)
+        access_token = get_access_token()
+
+        # Chirp 3 API endpoint
+        url = f"https://speech.googleapis.com/v2/projects/{CHIRP_PROJECT_ID}/locations/{CHIRP_REGION}/recognizers/{CHIRP_RECOGNIZER}:recognize"
+
+        headers = {
+            "Authorization": f"Bearer {access_token}",
+            "Content-Type": "application/json"
+        }
+
+        payload = {
+            "config": {
+                "explicitDecodingConfig": {
+                    "encoding": "LINEAR16",
+                    "sampleRateHertz": SAMPLE_RATE,
+                    "audioChannelCount": CHANNELS
+                },
+                "model": "chirp_3",
+                "languageCodes": ["en-US"]
+            },
+            "content": audio_b64
+        }
+
+        response = requests.post(url, headers=headers, json=payload, timeout=30)
+
+        if response.status_code != 200:
+            print(f"  [Chunk {chunk_id}] Chirp API error ({response.status_code}): {response.text[:200]}")
+            return (chunk_id, "")
+
+        data = response.json()
+
+        # Extract transcript from response
+        transcript = ""
+        for result in data.get("results", []):
+            alternatives = result.get("alternatives", [])
+            if alternatives:
+                transcript += alternatives[0].get("transcript", "") + " "
+
+        transcript = transcript.strip()
+        display = f"{transcript[:50]}..." if len(transcript) > 50 else transcript
+        print(f"  [Chunk {chunk_id}] Chirp 3 complete: {display}")
+        return (chunk_id, transcript)
+
+    except Exception as e:
+        print(f"  [Chunk {chunk_id}] Chirp error: {e}")
         return (chunk_id, "")
 
 
@@ -106,10 +158,10 @@ def process_chunk():
         chunk_id = chunk_counter
         chunk_counter += 1
 
-    print(f"  [Chunk {chunk_id}] Queued for STT ({len(chunk_data)/SAMPLE_RATE:.1f}s audio)")
+    print(f"  [Chunk {chunk_id}] Queued for Chirp 3 ({len(chunk_data)/SAMPLE_RATE:.1f}s audio)")
 
     # Submit for parallel processing
-    future = executor.submit(transcribe_chunk, chunk_id, chunk_data)
+    future = executor.submit(transcribe_chunk_chirp3, chunk_id, chunk_data)
     futures.append(future)
 
 
@@ -205,11 +257,11 @@ def stop_recording():
             audio_buffer.clear()
             chunk_id = chunk_counter
             print(f"  [Chunk {chunk_id}] Final chunk ({len(chunk_data)/SAMPLE_RATE:.1f}s audio)")
-            future = executor.submit(transcribe_chunk, chunk_id, chunk_data)
+            future = executor.submit(transcribe_chunk_chirp3, chunk_id, chunk_data)
             futures.append(future)
 
     # Wait for all STT to complete
-    print("  Waiting for all STT to complete...")
+    print("  Waiting for all Chirp 3 STT to complete...")
     results = {}
     for future in as_completed(futures):
         chunk_id, transcript = future.result()
@@ -252,19 +304,29 @@ def on_release(key):
 
 def main():
     print("="*60)
-    print("EchoFlow POC")
+    print("EchoFlow POC - Chirp 3 + Gemini Pro")
     print("="*60)
     print(f"Trigger key: Right Ctrl (hold to record)")
     print(f"Chunk duration: {CHUNK_DURATION}s")
-    print(f"STT Model: {STT_MODEL}")
-    print(f"Aggregation Model: {AGGREGATION_MODEL}")
+    print(f"STT: Google Chirp 3")
+    print(f"  Project: {CHIRP_PROJECT_ID}")
+    print(f"  Region: {CHIRP_REGION}")
+    print(f"Aggregation: {AGGREGATION_MODEL}")
     print("="*60)
     print("Press ESC to exit")
     print("="*60 + "\n")
 
+    # Validate config
+    if not CHIRP_PROJECT_ID:
+        raise ValueError("GOOGLE_CLOUD_PROJECT environment variable not set")
+
     # Initialize Gemini
     init_gemini()
     print("[Gemini initialized]")
+
+    # Test access token
+    get_access_token()
+    print("[Google Cloud auth OK]")
 
     # Start audio stream
     stream = sd.InputStream(
