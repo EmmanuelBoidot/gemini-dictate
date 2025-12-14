@@ -82,7 +82,7 @@ class GeminiClient {
                         console.log('Sending request to Gemini API...');
 
                         const response = await fetch(
-                            `${this.baseUrl}/models/gemini-2.0-flash-exp:generateContent?key=${this.apiKey}`,
+                            `${this.baseUrl}/models/gemini-2.5-flash:generateContent?key=${this.apiKey}`,
                             {
                                 method: 'POST',
                                 headers: {
@@ -90,7 +90,19 @@ class GeminiClient {
                                 },
                                 body: JSON.stringify({
                                     systemInstruction: {
-                                        parts: [{ text: "You are a perfect and accurate note taker. Transcribe the audio exactly as spoken, fixing minor stutters and hesitations but preserving the speaker's phrasing and meaning. Return only the transcribed text, nothing else. Do not add commentary, explanations, or descriptions." }]
+                                        parts: [{
+                                            text: `You are an expert audio transcriptionist and copy editor. I will provide you with an audio sample. Your sole task is to generate a full, perfect, and professional-grade transcript of the spoken content, in the language of the audio. It is possible that the audio contains English words in a language other than English. If so, please keep the English words in the transcript.
+
+Transcription Rules:
+* Refinement: Correct all grammatical errors, smooth out any awkward phrasing, and ensure all verb conjugations are accurate and consistent with the tense of the speech.
+* Punctuation: Apply correct standard English punctuation (commas, periods, question marks, capitalization, etc.) to enhance readability and clarity.
+
+Exclusions (Non-Verbatim Cleaning):
+* Remove all disfluencies/stuttering: Omit repetitions, stutters, and false starts (e.g., "I- I - I went" becomes "I went").
+* Remove all non-words/fillers: Exclude common hesitation sounds and filler words, such as 'um,' 'uh,' 'ah,' 'hmmm,' 'like' (when used as a filler), 'you know' (when used as a filler), 'so' (when used as a false start), and any audible breathing sounds or coughs.
+
+Return only the transcribed text, nothing else. Do not add commentary, explanations, or descriptions.`
+                                        }]
                                     },
                                     contents: [{
                                         parts: [{
