@@ -60,7 +60,7 @@ function createWindow() {
     mainWindow.loadFile('index.html');
 
     // Open DevTools for debugging (hidden window)
-    // mainWindow.webContents.openDevTools({ mode: 'detach' });
+    mainWindow.webContents.openDevTools({ mode: 'detach' });
 }
 
 function createTray() {
@@ -84,7 +84,7 @@ function updateTrayMenu() {
         { label: 'Quit', click: () => app.quit() }
     ]);
     tray.setContextMenu(contextMenu);
-    tray.setTitle(isDictating ? ' 🔴' : '');
+    tray.setTitle(isDictating ? ' 🟠' : '');
 }
 
 function registerShortcuts() {

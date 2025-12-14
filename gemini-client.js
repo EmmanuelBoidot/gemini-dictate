@@ -56,10 +56,9 @@ class GeminiClient {
             // Use Gemini's generateContent API with audio
             const sendToGemini = async () => {
                 while (isActive) {
-                    await new Promise(resolve => setTimeout(resolve, 5000)); // Send every 5 seconds to avoid rate limits
-
-                    if (audioChunks.length === 0) continue;
-
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                }
+                while (!isActive && audioChunks.length > 0) {
                     // Combine audio chunks
                     const totalLength = audioChunks.reduce((sum, chunk) => sum + chunk.length, 0);
                     const combinedAudio = new Int16Array(totalLength);

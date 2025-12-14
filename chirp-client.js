@@ -91,7 +91,7 @@ class ChirpClient {
             } finally {
                 isProcessing = false;
             }
-        }, 5000);
+        }, 5000); // STREAMING EVERY 5 SECONDS
 
         // Return controller to stop recording
         return {
