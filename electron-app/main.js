@@ -60,7 +60,7 @@ function createWindow() {
     mainWindow.loadFile('index.html');
 
     // Open DevTools for debugging (hidden window)
-    mainWindow.webContents.openDevTools({ mode: 'detach' });
+    // mainWindow.webContents.openDevTools({ mode: 'detach' });
 }
 
 function createTray() {
