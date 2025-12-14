@@ -1,4 +1,4 @@
-const { app, BrowserWindow, globalShortcut, Tray, Menu, ipcMain, shell } = require('electron');
+const { app, BrowserWindow, globalShortcut, Tray, Menu, ipcMain, shell, nativeImage } = require('electron');
 const path = require('path');
 const { exec } = require('child_process');
 
@@ -19,8 +19,17 @@ app.whenReady().then(async () => {
     createTray();
     registerShortcuts();
 
+    // Check for credentials and open settings if missing
+    const hasGeminiKey = store.get('geminiApiKey');
+    const hasChirpCreds = store.get('serviceAccountCreds') || store.get('chirpApiKey');
+
+    if (!hasGeminiKey && !hasChirpCreds) {
+        console.log('Main: No credentials found, opening settings...');
+        openSettings();
+    }
+
     // Open settings on launch for debugging
-    openSettings();
+    // openSettings();
 
     // On macOS, hide the dock icon since we are a menu bar app
     // Commented out for debugging visibility
@@ -44,12 +53,18 @@ function createWindow() {
     mainWindow.loadFile('index.html');
 
     // Open DevTools for debugging (hidden window)
-    mainWindow.webContents.openDevTools({ mode: 'detach' });
+    // mainWindow.webContents.openDevTools({ mode: 'detach' });
 }
 
 function createTray() {
-    const iconPath = path.join(__dirname, 'assets', 'iconTemplate.png'); // Need to create this
-    tray = new Tray(iconPath);
+    const iconPath = path.join(__dirname, 'assets', 'icon_new.png');
+
+    // Resize icon to standard macOS tray size (16x16 points, allowing for @2x)
+    // The image file seems to be large, so we resize it programmatically.
+    const icon = nativeImage.createFromPath(iconPath).resize({ width: 16, height: 16 });
+    // icon.setTemplateImage(true); // Ensure macOS treats it as a template (dark/light mode adaptation)
+
+    tray = new Tray(icon);
     updateTrayMenu();
 }
 
@@ -108,7 +123,7 @@ function openSettings() {
     settingsWindow.loadFile('settings.html');
 
     // Open DevTools for debugging
-    settingsWindow.webContents.openDevTools();
+    // settingsWindow.webContents.openDevTools();
 
     settingsWindow.on('closed', () => {
         settingsWindow = null;
