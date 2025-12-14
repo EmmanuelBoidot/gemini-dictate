@@ -282,7 +282,7 @@ ipcMain.on('start-stream', async (event, { sampleRate }) => {
             sampleRate,
             (text) => {
                 if (mainWindow) mainWindow.webContents.send('transcript', text);
-                insertText(text + ' ');
+                insertTextIntoActiveApp(text + ' ');
             },
             (err) => {
                 if (mainWindow) mainWindow.webContents.send('stream-error', err.message);
@@ -313,15 +313,17 @@ ipcMain.on('log', (event, msg) => {
 
 // Helper to insert text
 function insertTextIntoActiveApp(text) {
-    // Escape double quotes for AppleScript
-    const safeText = text.replace(/"/g, '\\"');
+    // Escape backslashes and double quotes for AppleScript
+    const safeText = text.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n');
 
     // AppleScript to type text (simulates keyboard)
     // Using 'keystroke' is slower but safer. 
     // Using clipboard + paste is faster for long text.
+    // Added delay to ensure clipboard is ready.
 
     const script = `
         set the clipboard to "${safeText}"
+        delay 0.1
         tell application "System Events" to keystroke "v" using command down
     `;
 

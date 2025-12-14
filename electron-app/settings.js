@@ -87,10 +87,17 @@ saveBtn.addEventListener('click', () => {
     }
 });
 
-// Engine toggle
+// Handle engine selection changes
 document.querySelectorAll('input[name="engine"]').forEach(radio => {
     radio.addEventListener('change', (e) => {
-        if (e.target.value === 'chirp') {
+        const engine = e.target.value;
+
+        // Auto-save changes immediately
+        ipcRenderer.send('set-setting', 'speechEngine', engine);
+        showStatus('Engine preference saved!', 'success');
+
+        // Show/hide Chirp settings
+        if (engine === 'chirp') {
             chirpSettings.style.display = 'block';
         } else {
             chirpSettings.style.display = 'none';
