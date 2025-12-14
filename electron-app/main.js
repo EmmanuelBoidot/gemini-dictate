@@ -19,6 +19,13 @@ app.whenReady().then(async () => {
     createTray();
     registerShortcuts();
 
+    // Set Dock Icon
+    if (process.platform === 'darwin') {
+        const iconPath = path.join(__dirname, 'assets', 'icon_source.png');
+        const icon = nativeImage.createFromPath(iconPath);
+        app.dock.setIcon(icon);
+    }
+
     // Check for credentials and open settings if missing
     const hasGeminiKey = store.get('geminiApiKey');
     const hasChirpCreds = store.get('serviceAccountCreds') || store.get('chirpApiKey');
@@ -57,7 +64,7 @@ function createWindow() {
 }
 
 function createTray() {
-    const iconPath = path.join(__dirname, 'assets', 'icon_new.png');
+    const iconPath = path.join(__dirname, 'assets', 'icon_source.png');
 
     // Resize icon to standard macOS tray size (16x16 points, allowing for @2x)
     // The image file seems to be large, so we resize it programmatically.
