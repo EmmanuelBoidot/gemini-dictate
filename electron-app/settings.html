@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gemini Dictate - Settings</title>
+    <link rel="stylesheet" href="../styles.css">
+    <style>
+        body {
+            padding: 20px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+
+        .container {
+            max-width: 100%;
+        }
+
+        /* Adjustments for Electron window */
+        header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <h1>🎤 Gemini Dictate</h1>
+            <p class="subtitle">Settings</p>
+        </header>
+
+        <main>
+            <section class="card">
+                <h2>API Configuration</h2>
+                <div class="form-group">
+                    <label for="apiKey">Gemini API Key</label>
+                    <input type="password" id="apiKey" placeholder="Enter your Gemini API key">
+                </div>
+                <div class="button-group">
+                    <button id="saveBtn" class="btn btn-primary">Save Settings</button>
+                </div>
+                <div id="status" class="status hidden"></div>
+            </section>
+
+            <section class="card">
+                <h2>Transcription Engine</h2>
+                <div class="form-group">
+                    <div class="radio-group">
+                        <label class="radio-option">
+                            <input type="radio" name="engine" value="gemini" id="engineGemini">
+                            <div class="radio-content">
+                                <strong>Gemini AI Transcription</strong>
+                                <p class="help-text">Advanced AI-powered transcription.</p>
+                            </div>
+                        </label>
+
+                        <label class="radio-option">
+                            <input type="radio" name="engine" value="chirp" id="engineChirp">
+                            <div class="radio-content">
+                                <strong>Google Chirp 3</strong>
+                                <p class="help-text">Cloud Speech-to-Text V2.</p>
+                            </div>
+                        </label>
+                    </div>
+
+                    <!-- Chirp Settings -->
+                    <div id="chirpSettings"
+                        style="display: none; margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+                        <h3>Chirp 3 Configuration</h3>
+
+                        <div class="form-group">
+                            <label for="chirpProjectId">Project ID</label>
+                            <input type="text" id="chirpProjectId" placeholder="e.g., my-project-123">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="chirpRegion">Region</label>
+                            <select id="chirpRegion" style="width: 100%; padding: 8px;">
+                                <option value="global">global</option>
+                                <option value="us">us (US Multi-region)</option>
+                                <option value="us-central1">us-central1</option>
+                                <option value="europe-west4">europe-west4</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="chirpRecognizerId">Recognizer ID</label>
+                            <input type="text" id="chirpRecognizerId" value="_">
+                        </div>
+
+                        <div class="form-group">
+                            <label>Authentication Method</label>
+                            <div class="radio-group">
+                                <label class="radio-option">
+                                    <input type="radio" name="chirpAuthMethod" value="apiKey">
+                                    <div class="radio-content">API Key</div>
+                                </label>
+                                <label class="radio-option">
+                                    <input type="radio" name="chirpAuthMethod" value="serviceAccount">
+                                    <div class="radio-content">Service Account JSON</div>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div id="chirpApiKeySection">
+                            <div class="form-group">
+                                <label for="chirpApiKey">Google Cloud API Key</label>
+                                <input type="password" id="chirpApiKey">
+                            </div>
+                        </div>
+
+                        <div id="chirpServiceAccountSection" style="display: none;">
+                            <div class="form-group">
+                                <label for="serviceAccountFile">Service Account JSON File</label>
+                                <input type="file" id="serviceAccountFile" accept=".json">
+                            </div>
+                            <div id="serviceAccountStatus" style="margin-top: 5px; font-size: 0.9em;"></div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+    <script src="settings.js"></script>
+</body>
+
+</html>

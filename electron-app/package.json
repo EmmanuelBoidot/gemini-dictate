@@ -1,0 +1,23 @@
+{
+  "name": "gemini-dictate",
+  "productName": "Gemini Dictate",
+  "version": "1.0.0",
+  "description": "",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "electron": "^39.2.7",
+    "electron-builder": "^26.0.12"
+  },
+  "dependencies": {
+    "@google-cloud/speech": "^7.2.1",
+    "electron-store": "^11.0.2"
+  }
+}
