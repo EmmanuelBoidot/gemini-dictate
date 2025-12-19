@@ -74,7 +74,8 @@
               </div>
             </label>
 
-            <label class="radio-option" id="chirpOption">
+            <!-- Hide Chirp Option -->
+            <label class="radio-option" id="chirpOption" style="display: none;">
               <input type="radio" name="engine" value="chirp" id="engineChirp">
               <div class="radio-content">
                 <strong>Google Chirp 3 (Cloud Speech-to-Text V2)</strong>
@@ -87,7 +88,7 @@
             ⚠️ Gemini transcription requires an API key. Please save your API key above to enable this option.
           </p>
 
-          <!-- Chirp Settings (Hidden by default) -->
+          <!-- Chirp Settings (Hidden) -->
           <div id="chirpSettings"
             style="display: none; margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px; border: 1px solid #e0e0e0;">
             <h3>Chirp 3 Configuration</h3>
