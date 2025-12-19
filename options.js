@@ -1,5 +1,4 @@
 // Options page script for Gemini Dictate extension
-const { ipcRenderer } = require('electron');
 
 const apiKeyInput = document.getElementById('apiKey');
 const saveBtn = document.getElementById('saveBtn');
@@ -25,73 +24,74 @@ const serviceAccountFile = document.getElementById('serviceAccountFile');
 const serviceAccountStatus = document.getElementById('serviceAccountStatus');
 
 // Load saved settings on page load
-document.addEventListener('DOMContentLoaded', async () => {
-    const result = await ipcRenderer.invoke('get-settings');
+document.addEventListener('DOMContentLoaded', () => {
+    chrome.storage.sync.get([
+        'geminiApiKey',
+        'speechEngine',
+        'chirpProjectId',
+        'chirpRegion',
+        'chirpRecognizerId',
+        'chirpApiKey',
+        'chirpAuthMethod'
+    ], (result) => {
+        // Load Gemini API key
+        if (result.geminiApiKey) {
+            apiKeyInput.value = result.geminiApiKey;
+            enableGeminiOption();
+        } else {
+            disableGeminiOption();
+        }
 
-    // Load Gemini API key
-    if (result.geminiApiKey) {
-        apiKeyInput.value = result.geminiApiKey;
-        enableGeminiOption();
-    } else {
-        disableGeminiOption();
-    }
+        // Load Chirp settings
+        if (result.chirpProjectId) chirpProjectIdInput.value = result.chirpProjectId;
+        if (result.chirpRegion) chirpRegionSelect.value = result.chirpRegion;
+        if (result.chirpRecognizerId) chirpRecognizerIdInput.value = result.chirpRecognizerId;
+        if (result.chirpApiKey) chirpApiKeyInput.value = result.chirpApiKey;
 
-    // Load Chirp settings
-    if (result.chirpProjectId) chirpProjectIdInput.value = result.chirpProjectId;
-    if (result.chirpRegion) chirpRegionSelect.value = result.chirpRegion;
-    if (result.chirpRecognizerId) chirpRecognizerIdInput.value = result.chirpRecognizerId;
-    if (result.chirpApiKey) chirpApiKeyInput.value = result.chirpApiKey;
+        // Load Chirp auth method
+        const chirpAuthMethod = result.chirpAuthMethod || 'apiKey';
+        const authRadio = document.querySelector(`input[name="chirpAuthMethod"][value="${chirpAuthMethod}"]`);
+        if (authRadio) authRadio.checked = true;
+        toggleAuthSections(chirpAuthMethod);
 
-    // Load Chirp auth method
-    const chirpAuthMethod = result.chirpAuthMethod || 'apiKey';
-    const authRadio = document.querySelector(`input[name="chirpAuthMethod"][value="${chirpAuthMethod}"]`);
-    if (authRadio) authRadio.checked = true;
-    toggleAuthSections(chirpAuthMethod);
-
-    // Load Service Account credentials status
-    if (result.serviceAccountCreds && result.serviceAccountCreds.client_email) {
-        serviceAccountStatus.textContent = `✅ Loaded: ${result.serviceAccountCreds.client_email}`;
-        serviceAccountStatus.style.color = 'green';
-    } else {
-        serviceAccountStatus.textContent = 'No Service Account file loaded.';
-        serviceAccountStatus.style.color = 'gray';
-    }
-
-    // Load engine preference
-    const engine = result.speechEngine || 'chrome';
-    if (engine === 'gemini' && result.geminiApiKey) {
-        engineGeminiRadio.checked = true;
-    } else if (engine === 'chirp') {
-        engineChirpRadio.checked = true;
-        chirpSettings.style.display = 'block';
-    } else { // Default to Chrome if no preference or Gemini key is missing
-        document.querySelector('input[value="chrome"]').checked = true;
-    }
+        // Load engine preference
+        const engine = result.speechEngine || 'chrome';
+        if (engine === 'gemini' && result.geminiApiKey) {
+            engineGeminiRadio.checked = true;
+        } else if (engine === 'chirp') {
+            engineChirpRadio.checked = true;
+            chirpSettings.style.display = 'block';
+        } else { // Default to Chrome
+            const chromeRadio = document.querySelector('input[value="chrome"]');
+            if (chromeRadio) chromeRadio.checked = true;
+        }
+    });
 });
 
 // Save settings
-saveBtn.addEventListener('click', async () => {
+saveBtn.addEventListener('click', () => {
     const apiKey = apiKeyInput.value.trim();
     const chirpProjectId = chirpProjectIdInput.value.trim();
     const chirpRegion = chirpRegionSelect.value;
     const chirpRecognizerId = chirpRecognizerIdInput.value.trim();
     const chirpApiKey = chirpApiKeyInput.value.trim();
     const chirpAuthMethod = document.querySelector('input[name="chirpAuthMethod"]:checked').value;
+    const selectedEngine = document.querySelector('input[name="engine"]:checked').value;
 
-    if (!apiKey && !chirpApiKey && chirpAuthMethod === 'apiKey') {
-        showStatus('Please enter at least one API key (Gemini or Chirp)', 'error');
+    if (selectedEngine === 'gemini' && !apiKey) {
+        showStatus('Please enter a Gemini API key to use the Gemini engine.', 'error');
         return;
     }
 
-    // Validate Gemini API key format (basic check) if provided
+    // Validate Gemini API key format
     if (apiKey && !apiKey.startsWith('AIza')) {
-        showStatus('Invalid Gemini API key format. Gemini API keys typically start with "AIza"', 'error');
+        showStatus('Invalid Gemini API key format (should start with "AIza")', 'error');
         return;
     }
 
-    // Save to Electron Store via IPC
     const settings = {
         geminiApiKey: apiKey,
+        speechEngine: selectedEngine,
         chirpProjectId: chirpProjectId,
         chirpRegion: chirpRegion,
         chirpRecognizerId: chirpRecognizerId,
@@ -99,22 +99,16 @@ saveBtn.addEventListener('click', async () => {
         chirpAuthMethod: chirpAuthMethod
     };
 
-    // We also need to get the current engine selection to save it, 
-    // or rely on the radio button listener. 
-    // But let's save everything here to be safe.
-    const selectedEngine = document.querySelector('input[name="engine"]:checked').value;
-    settings.speechEngine = selectedEngine;
+    chrome.storage.sync.set(settings, () => {
+        showStatus('Settings saved successfully!', 'success');
 
-    ipcRenderer.send('set-settings', settings);
-
-    showStatus('Settings saved successfully!', 'success');
-
-    // Update Gemini option state
-    if (apiKey) {
-        enableGeminiOption();
-    } else {
-        disableGeminiOption();
-    }
+        // Update UI state
+        if (apiKey) {
+            enableGeminiOption();
+        } else {
+            disableGeminiOption();
+        }
+    });
 });
 
 // Handle Service Account File Upload
@@ -130,14 +124,14 @@ serviceAccountFile.addEventListener('change', (e) => {
                 throw new Error('Invalid Service Account JSON. Missing client_email or private_key.');
             }
 
-            // Store sensitive credentials via IPC
+            // Store sensitive credentials
             const creds = {
                 client_email: json.client_email,
                 private_key: json.private_key,
                 project_id: json.project_id
             };
 
-            ipcRenderer.send('set-setting', 'serviceAccountCreds', creds);
+            chrome.storage.sync.set({ serviceAccountCreds: creds });
 
             serviceAccountStatus.textContent = `✅ Loaded: ${json.client_email}`;
             serviceAccountStatus.style.color = 'green';
@@ -180,7 +174,7 @@ function toggleAuthSections(method) {
 document.querySelectorAll('input[name="engine"]').forEach(radio => {
     radio.addEventListener('change', (e) => {
         const engine = e.target.value;
-        ipcRenderer.send('set-setting', 'speechEngine', engine);
+        chrome.storage.sync.set({ speechEngine: engine });
 
         // Show/hide Chirp settings
         if (engine === 'chirp') {
@@ -200,11 +194,10 @@ function enableGeminiOption() {
 function disableGeminiOption() {
     geminiOption.classList.add('disabled');
     engineGeminiRadio.disabled = true;
-    if (engineGeminiRadio.checked) {
-        // Fallback if current selection becomes disabled
-        document.querySelector('input[value="chrome"]').checked = true;
-        ipcRenderer.send('set-setting', 'speechEngine', 'chrome');
-    }
+    // Fallback if current selection becomes disabled
+    const chromeRadio = document.querySelector('input[value="chrome"]');
+    if (chromeRadio) chromeRadio.checked = true;
+    chrome.storage.sync.set({ speechEngine: 'chrome' });
     geminiDisabledNote.style.display = 'block';
 }
 

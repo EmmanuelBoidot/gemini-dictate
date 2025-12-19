@@ -81,7 +81,7 @@ class GeminiClient {
                         console.log('Sending request to Gemini API...');
 
                         const response = await fetch(
-                            `${this.baseUrl}/models/gemini-2.5-flash:generateContent?key=${this.apiKey}`,
+                            `${this.baseUrl}/models/gemini-3-flash-preview:generateContent?key=${this.apiKey}`,
                             {
                                 method: 'POST',
                                 headers: {
@@ -225,7 +225,7 @@ Return only the transcribed text, nothing else. Do not add commentary, explanati
     async testConnection() {
         try {
             const response = await fetch(
-                `${this.baseUrl}/models/gemini-2.5-flash:generateContent?key=${this.apiKey}`,
+                `${this.baseUrl}/models/gemini-3-flash-preview:generateContent?key=${this.apiKey}`,
                 {
                     method: 'POST',
                     headers: {

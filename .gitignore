@@ -1,1 +1,3 @@
+.DS_STORE
 electron-app/node_modules
+electron-app/out

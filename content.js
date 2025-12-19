@@ -21,7 +21,36 @@ async function toggleDictation() {
     if (isActive) {
         stopDictation();
     } else {
-        await startDictation();
+        const activeElement = document.activeElement;
+        if (!isTextInput(activeElement)) {
+            console.log('[Gemini Dictate] No text input focused. Please click in a text field first.');
+            return;
+        }
+
+        currentInput = activeElement;
+
+        // Get settings from storage
+        chrome.storage.sync.get(['geminiApiKey', 'speechEngine'], async (result) => {
+            const engine = result.speechEngine || 'chrome';
+            const apiKey = result.geminiApiKey;
+
+            console.log(`[Gemini Dictate] Starting dictation. Chosen engine: ${engine.toUpperCase()}`);
+
+            if (engine === 'gemini' && apiKey) {
+                console.log('[Gemini Dictate] Initializing Gemini AI engine...');
+                await startGeminiDictation(apiKey);
+            } else if (engine === 'chirp' && apiKey) {
+                console.log('[Gemini Dictate] Initializing Chirp engine (via Gemini bridge)...');
+                await startGeminiDictation(apiKey);
+            } else {
+                if (engine !== 'chrome') {
+                    console.log(`[Gemini Dictate] Fallback: Engine was ${engine} but no API key found. Using Chrome Web Speech.`);
+                } else {
+                    console.log('[Gemini Dictate] Initializing Chrome Web Speech engine...');
+                }
+                await startDictation();
+            }
+        });
     }
 }
 
@@ -54,9 +83,9 @@ async function startDictation() {
 
         isActive = true;
 
-        // Store recognition instance and input reference for cleanup
+        // Capture the target for this session in a closure
+        const capturedTarget = currentInput;
         window.currentRecognition = recognition;
-        window.dictationTarget = currentInput; // Store separately so it persists
 
         // Add visual indicator
         addVisualIndicator();
@@ -78,25 +107,25 @@ async function startDictation() {
                 }
             }
 
-            if (window.dictationTarget) {
+            if (capturedTarget) {
                 // If we have a final transcript, insert it permanently
                 if (finalTranscript) {
                     // Remove any interim text first
                     if (lastInterimLength > 0) {
-                        removeLastChars(window.dictationTarget, lastInterimLength);
+                        removeLastChars(capturedTarget, lastInterimLength);
                         lastInterimLength = 0;
                     }
                     // Insert final text
-                    insertTextToTarget(window.dictationTarget, finalTranscript);
+                    insertTextToTarget(capturedTarget, finalTranscript);
                 }
                 // If we have interim text, show it (but it will be replaced)
                 else if (interimTranscript) {
                     // Remove previous interim text
                     if (lastInterimLength > 0) {
-                        removeLastChars(window.dictationTarget, lastInterimLength);
+                        removeLastChars(capturedTarget, lastInterimLength);
                     }
                     // Insert new interim text
-                    insertTextToTarget(window.dictationTarget, interimTranscript);
+                    insertTextToTarget(capturedTarget, interimTranscript);
                     lastInterimLength = interimTranscript.length;
                 }
             }
@@ -172,7 +201,10 @@ async function startGeminiDictation(apiKey) {
         console.log('[Gemini Dictate] Microphone access granted for Gemini.');
 
         isActive = true;
-        window.dictationTarget = currentInput;
+
+        // Capture the target for this session in a closure
+        // This ensures text lands in the right box even if we stop or move focus later
+        const capturedTarget = currentInput;
 
         // Add visual indicator
         addVisualIndicator();
@@ -186,9 +218,9 @@ async function startGeminiDictation(apiKey) {
             stream,
             // onTranscript callback
             (text) => {
-                if (window.dictationTarget && text) {
+                if (capturedTarget && text) {
                     console.log('[Gemini Dictate] Gemini - Transcript received:', text);
-                    insertTextToTarget(window.dictationTarget, text + ' ');
+                    insertTextToTarget(capturedTarget, text + ' ');
                 }
             },
             // onError callback
@@ -225,7 +257,7 @@ async function startGeminiDictation(apiKey) {
         } else {
             alert('Could not start Gemini transcription. Falling back to Chrome Web Speech API.');
             // Fallback to Chrome Web Speech
-            await startChromeWebSpeech();
+            await startDictation();
         }
 
         stopDictation();
@@ -249,11 +281,6 @@ function stopDictation() {
         window.geminiController.stop();
         window.geminiController = null;
     }
-
-    // Clear target reference after a delay to allow final transcripts to arrive
-    setTimeout(() => {
-        window.dictationTarget = null;
-    }, 2000);
 
     // Remove visual indicator
     removeVisualIndicator();
@@ -317,12 +344,27 @@ function removeLastChars(target, count) {
  * Insert text into a specific target element (bypasses isActive check)
  */
 function insertTextToTarget(target, text) {
-    if (!target) return;
+    if (!target) {
+        console.log('[Gemini Dictate] insertTextToTarget failed: No target element.');
+        return;
+    }
+
+    console.log('[Gemini Dictate] Inserting text into target:', target.tagName, text);
 
     const tagName = target.tagName.toLowerCase();
 
     if (tagName === 'input' || tagName === 'textarea') {
-        // For input and textarea elements
+        // Try to use execCommand first as it's more compatible with frameworks and undo history
+        target.focus();
+        try {
+            if (document.execCommand('insertText', false, text)) {
+                return;
+            }
+        } catch (e) {
+            console.log('[Gemini Dictate] execCommand failed, falling back to value property');
+        }
+
+        // Fallback for elements where execCommand fails
         const start = target.selectionStart || 0;
         const end = target.selectionEnd || 0;
         const currentValue = target.value || '';
@@ -339,7 +381,17 @@ function insertTextToTarget(target, text) {
         target.dispatchEvent(new Event('input', { bubbles: true }));
         target.dispatchEvent(new Event('change', { bubbles: true }));
     } else if (target.contentEditable === 'true') {
-        // For contenteditable elements
+        // Try to use execCommand first
+        target.focus();
+        try {
+            if (document.execCommand('insertText', false, text)) {
+                return;
+            }
+        } catch (e) {
+            console.log('[Gemini Dictate] contenteditable execCommand failed');
+        }
+
+        // Fallback method
         const selection = window.getSelection();
         if (selection.rangeCount > 0) {
             const range = selection.getRangeAt(0);

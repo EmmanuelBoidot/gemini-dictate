@@ -9,7 +9,9 @@ chrome.commands.onCommand.addListener((command) => {
         // Send message to content script to toggle dictation
         chrome.tabs.sendMessage(tabs[0].id, { action: 'toggle-dictation' }, (response) => {
           if (chrome.runtime.lastError) {
-            console.error('Error sending message:', chrome.runtime.lastError.message);
+            // This is expected if the content script hasn't loaded yet or the tab is restricted
+            // console.error('Error sending message:', chrome.runtime.lastError.message);
+            console.log('Dictation toggle: Content script not ready or restricted page:', chrome.runtime.lastError.message);
           }
         });
       }
@@ -36,16 +38,47 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     console.log(`Background: Received ${request.action} request`);
 
     // Ensure offscreen document exists
-    ensureOffscreenDocument().then(() => {
+    ensureOffscreenDocument().then(async (created) => {
+      // If we just created the document, wait a bit for it to be ready
+      if (created) {
+        console.log('Background: Waiting for offscreen document to initialize...');
+        await new Promise(resolve => setTimeout(resolve, 800));
+      }
+
       console.log('Background: Forwarding to offscreen document');
-      // Forward the request to the offscreen document
-      chrome.runtime.sendMessage(request, (response) => {
-        console.log('Background: Got response from offscreen:', response);
-        sendResponse(response);
+      const offscreenRequest = { ...request, action: `offscreen-${request.action}` };
+
+      // Add a timeout for the offscreen response
+      let responseSent = false;
+      const timeoutId = setTimeout(() => {
+        if (!responseSent) {
+          responseSent = true;
+          sendResponse({ success: false, error: 'Transcription request timed out (20s)' });
+        }
+      }, 20000);
+
+      chrome.runtime.sendMessage(offscreenRequest, (response) => {
+        if (responseSent) return;
+        clearTimeout(timeoutId);
+        responseSent = true;
+
+        if (chrome.runtime.lastError) {
+          console.error('Background: Error from offscreen message:', chrome.runtime.lastError.message);
+          sendResponse({
+            success: false,
+            error: `Offscreen communication failed: ${chrome.runtime.lastError.message}`
+          });
+        } else if (!response) {
+          console.error('Background: No response received from offscreen document');
+          sendResponse({ success: false, error: 'No response from offscreen document' });
+        } else {
+          console.log('Background: Got response from offscreen:', response);
+          sendResponse(response);
+        }
       });
     }).catch(error => {
-      console.error('Background: Failed to create offscreen document:', error);
-      sendResponse({ success: false, error: error.message });
+      console.error('Background: Failed to manage offscreen document:', error);
+      sendResponse({ success: false, error: `Offscreen management error: ${error.message}` });
     });
 
     return true; // Keep message channel open
@@ -61,7 +94,7 @@ async function ensureOffscreenDocument() {
   });
 
   if (existingContexts.length > 0) {
-    return; // Already exists
+    return false; // Already exists
   }
 
   // Create offscreen document
@@ -72,6 +105,7 @@ async function ensureOffscreenDocument() {
   });
 
   console.log('Background: Created offscreen document');
+  return true; // Just created
 }
 
 // Handle extension installation

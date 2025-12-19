@@ -2,13 +2,13 @@
 // This runs in a hidden page context with fewer restrictions than service workers
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-    if (request.action === 'gemini-transcribe') {
+    if (request.action === 'offscreen-gemini-transcribe') {
         const { apiKey, audioBase64, systemInstruction } = request;
 
         console.log('Offscreen: Received transcription request, audio length:', audioBase64?.length);
 
         fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`,
             {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -16,7 +16,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                     contents: [{
                         parts: [{
                             inline_data: {
-                                mime_type: "audio/pcm;rate=16000",
+                                mime_type: "audio/wav",
                                 data: audioBase64
                             }
                         }]
@@ -42,9 +42,29 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                 return response.json();
             })
             .then(data => {
-                const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-                console.log('Offscreen: Transcribed text:', text);
-                sendResponse({ success: true, text: text?.trim() || '', data });
+                const candidate = data.candidates?.[0];
+                const text = candidate?.content?.parts?.[0]?.text;
+
+                console.log('Offscreen: API Response Data:', JSON.stringify(data));
+
+                if (!text && data.promptFeedback) {
+                    console.warn('Offscreen: Prompt was blocked by safety filters:', data.promptFeedback);
+                } else if (!text && candidate?.finishReason) {
+                    console.warn('Offscreen: Candidate was blocked or failed. Finish reason:', candidate.finishReason);
+                }
+
+                if (text) {
+                    console.log('Offscreen: Transcribed text:', text);
+                    sendResponse({ success: true, text: text.trim(), data });
+                } else {
+                    console.warn('Offscreen: No text found in API response');
+                    sendResponse({
+                        success: true,
+                        text: '',
+                        data,
+                        warning: 'No transcription generated. Speech might be too quiet or unclear.'
+                    });
+                }
             })
             .catch(error => {
                 console.error('Offscreen: Gemini API error:', error);
@@ -54,13 +74,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         return true; // Keep message channel open for async response
     }
 
-    if (request.action === 'chirp-transcribe') {
+    if (request.action === 'offscreen-chirp-transcribe') {
         const { apiKey, projectId, region, recognizerId, audioBase64 } = request;
 
         console.log('Offscreen: Received Chirp transcription request');
 
-        // Check for Service Account credentials in local storage
-        chrome.storage.local.get(['serviceAccountCreds'], async (result) => {
+        // Check for Service Account credentials in sync storage (matching options.js)
+        chrome.storage.sync.get(['serviceAccountCreds'], async (result) => {
             let authHeader = {};
             let finalApiKey = apiKey;
 

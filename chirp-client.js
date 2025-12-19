@@ -22,10 +22,17 @@ class ChirpClient {
 
         // Initialize AudioWorklet
         const audioContext = new AudioContext({ sampleRate: 16000 });
-        await audioContext.audioWorklet.addModule(chrome.runtime.getURL('audio-processor.js'));
 
+        let workletUrl;
+        if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.getURL) {
+            workletUrl = chrome.runtime.getURL('audio-processor.js');
+        } else {
+            workletUrl = 'audio-processor.js';
+        }
+
+        await audioContext.audioWorklet.addModule(workletUrl);
         const source = audioContext.createMediaStreamSource(stream);
-        const processor = new AudioWorkletNode(audioContext, 'audio-processor');
+        const processor = new AudioWorkletNode(audioContext, 'audio-capture-processor');
 
         source.connect(processor);
         processor.connect(audioContext.destination);
@@ -35,8 +42,8 @@ class ChirpClient {
 
         // Process audio chunks from worklet
         processor.port.onmessage = async (event) => {
-            if (event.data.audio) {
-                audioChunks.push(event.data.audio);
+            if (event.data.audioData) {
+                audioChunks.push(event.data.audioData);
             }
         };
 

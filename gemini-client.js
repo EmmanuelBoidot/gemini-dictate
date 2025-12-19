@@ -21,7 +21,15 @@ class GeminiClient {
 
             // Load the audio worklet processor
             try {
-                const workletUrl = 'audio-processor.js'; // Relative path for Electron
+                let workletUrl;
+                if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.getURL) {
+                    // Chrome Extension environment
+                    workletUrl = chrome.runtime.getURL('audio-processor.js');
+                } else {
+                    // Electron or other environment
+                    workletUrl = 'audio-processor.js';
+                }
+
                 console.log('Loading AudioWorklet from:', workletUrl);
                 await audioContext.audioWorklet.addModule(workletUrl);
                 console.log('AudioWorklet loaded successfully');
@@ -71,8 +79,9 @@ class GeminiClient {
 
                     console.log(`Sending ${combinedAudio.length} audio samples (${(combinedAudio.length / 16000).toFixed(2)}s of audio)`);
 
-                    // Convert to base64 (raw PCM, little-endian, 16-bit)
-                    const base64Audio = this.arrayBufferToBase64(combinedAudio.buffer);
+                    // Convert to WAV format (add header) for better API compatibility
+                    const wavBuffer = this.createWavBuffer(combinedAudio, 16000);
+                    const base64Audio = this.arrayBufferToBase64(wavBuffer);
                     console.log(`Base64 audio length: ${base64Audio.length} characters`);
 
                     // Notify that we're processing
@@ -82,14 +91,30 @@ class GeminiClient {
                         console.log('Sending request to background script...');
 
                         // Send request through background script to avoid content script fetch restrictions
+                        const expertPrompt = `You are an expert audio transcriptionist and copy editor. I will provide you with an audio sample. Your sole task is to generate a full, perfect, and professional-grade transcript of the spoken content, in the language of the audio. It is possible that the audio contains English words in a language other than English. If so, please keep the English words in the transcript.
+
+Transcription Rules:
+* Refinement: Correct all grammatical errors, smooth out any awkward phrasing, and ensure all verb conjugations are accurate and consistent with the tense of the speech.
+* Punctuation: Apply correct standard English punctuation (commas, periods, question marks, capitalization, etc.) to enhance readability and clarity.
+
+Exclusions (Non-Verbatim Cleaning):
+* Remove all disfluencies/stuttering: Omit repetitions, stutters, and false starts (e.g., "I- I - I went" becomes "I went").
+* Remove all non-words/fillers: Exclude common hesitation sounds and filler words, such as 'um,' 'uh,' 'ah,' 'hmmm,' 'like' (when used as a filler), 'you know' (when used as a filler), 'so' (when used as a false start), and any audible breathing sounds or coughs.
+
+Return only the transcribed text, nothing else. Do not add commentary, explanations, or descriptions.`;
+
                         const response = await chrome.runtime.sendMessage({
                             action: 'gemini-transcribe',
                             apiKey: this.apiKey,
                             audioBase64: base64Audio,
-                            systemInstruction: "You are a perfect and accurate note taker. Transcribe the audio exactly as spoken, fixing minor stutters and hesitations but preserving the speaker's phrasing and meaning. Return only the transcribed text, nothing else. Do not add commentary, explanations, or descriptions."
+                            systemInstruction: expertPrompt
                         });
 
                         console.log('Background script response:', response);
+
+                        if (!response) {
+                            throw new Error('No response received from background script. Extension might have been reloaded.');
+                        }
 
                         if (!response.success) {
                             throw new Error(response.error || 'Unknown error from background script');
@@ -135,11 +160,58 @@ class GeminiClient {
                     workletNode.disconnect();
                     source.disconnect();
                     audioContext.close();
+
+                    // Stop all tracks in the stream to release the microphone
+                    audioStream.getTracks().forEach(track => track.stop());
                 }
             };
         } catch (error) {
             onError(error);
             return { stop: () => { } };
+        }
+    }
+
+    /**
+     * Create a WAV buffer from Int16 PCM data
+     */
+    createWavBuffer(pcmData, sampleRate) {
+        const numChannels = 1;
+        const byteRate = sampleRate * numChannels * 2;
+        const blockAlign = numChannels * 2;
+        const dataSize = pcmData.length * 2;
+        const buffer = new ArrayBuffer(44 + dataSize);
+        const view = new DataView(buffer);
+
+        // RIFF chunk descriptor
+        this.writeString(view, 0, 'RIFF');
+        view.setUint32(4, 36 + dataSize, true);
+        this.writeString(view, 8, 'WAVE');
+
+        // fmt sub-chunk
+        this.writeString(view, 12, 'fmt ');
+        view.setUint32(16, 16, true); // Subchunk1Size (16 for PCM)
+        view.setUint16(20, 1, true); // AudioFormat (1 for PCM)
+        view.setUint16(22, numChannels, true); // NumChannels
+        view.setUint32(24, sampleRate, true); // SampleRate
+        view.setUint32(28, byteRate, true); // ByteRate
+        view.setUint16(32, blockAlign, true); // BlockAlign
+        view.setUint16(34, 16, true); // BitsPerSample
+
+        // data sub-chunk
+        this.writeString(view, 36, 'data');
+        view.setUint32(40, dataSize, true);
+
+        // Write PCM data
+        const pcmBytes = new Uint8Array(pcmData.buffer);
+        const wavBytes = new Uint8Array(buffer, 44);
+        wavBytes.set(pcmBytes);
+
+        return buffer;
+    }
+
+    writeString(view, offset, string) {
+        for (let i = 0; i < string.length; i++) {
+            view.setUint8(offset + i, string.charCodeAt(i));
         }
     }
 
@@ -162,7 +234,7 @@ class GeminiClient {
     async testConnection() {
         try {
             const response = await fetch(
-                `${this.baseUrl}/models/gemini-2.5-flash:generateContent?key=${this.apiKey}`,
+                `${this.baseUrl}/models/gemini-3-flash-preview:generateContent?key=${this.apiKey}`,
                 {
                     method: 'POST',
                     headers: {
