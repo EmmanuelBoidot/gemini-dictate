@@ -4,7 +4,6 @@ import SwiftUI
 class KeyboardViewController: UIInputViewController {
     private var keyboardView: KeyboardView?
     private let recorder = AudioRecorder()
-    private let geminiClient = GeminiClient(apiKey: "YOUR_GEMINI_API_KEY") // TODO: Replace with your actual key
     private var isRecording = false
 
     override func updateViewConstraints() {
@@ -59,6 +58,12 @@ class KeyboardViewController: UIInputViewController {
         if isRecording {
             stopRecordingAndTranscribe()
         } else {
+            let key = SettingsManager.shared.apiKey
+            if key.isEmpty {
+                // Optionally let user know key is missing
+                textDocumentProxy.insertText("[Please set API Key in Gemini App]")
+                return
+            }
             startRecording()
         }
     }
@@ -80,16 +85,16 @@ class KeyboardViewController: UIInputViewController {
         }
         
         isRecording = false
-        // You might want to update the SwiftUI view state here to show "Processing"
+        let key = SettingsManager.shared.apiKey
+        let client = GeminiClient(apiKey: key)
         
-        geminiClient.transcribe(audioData: audioData) { [weak self] result in
+        client.transcribe(audioData: audioData) { [weak self] result in
             DispatchQueue.main.async {
                 switch result {
                 case .success(let text):
                     self?.textDocumentProxy.insertText(text)
                 case .failure(let error):
                     print("Transcription failed: \(error.localizedDescription)")
-                    // Optionally show error in keyboard extension
                 }
             }
         }

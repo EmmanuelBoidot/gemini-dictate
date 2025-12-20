@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct ContentView: View {
+    @State private var apiKey: String = SettingsManager.shared.apiKey
+    
     var body: some View {
         VStack(spacing: 20) {
             Image(systemName: "keyboard.fill")
@@ -13,7 +15,33 @@ struct ContentView: View {
                 .font(.largeTitle)
                 .fontWeight(.bold)
             
-            Text("To use the keyboard:")
+            VStack(alignment: .leading, spacing: 14) {
+                Text("1. Enter your Gemini API Key")
+                    .font(.headline)
+                
+                TextField("Enter API Key here", text: $apiKey)
+                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                    .autocorrectionDisabled()
+                    .textInputAutocapitalization(.never)
+                    .onChange(of: apiKey) { newValue in
+                        SettingsManager.shared.apiKey = newValue
+                    }
+                
+                if apiKey.isEmpty {
+                    Text("⚠️ Required for transcription to work")
+                        .font(.caption)
+                        .foregroundColor(.red)
+                } else {
+                    Text("✅ Key saved")
+                        .font(.caption)
+                        .foregroundColor(.green)
+                }
+            }
+            .padding()
+            .background(Color(.systemGray6))
+            .cornerRadius(12)
+
+            Text("2. Setup the keyboard:")
                 .font(.headline)
             
             VStack(alignment: .leading, spacing: 10) {

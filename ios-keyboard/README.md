@@ -24,10 +24,16 @@ This folder contains the source code for a custom iOS Keyboard Extension that us
 4. **Configure Permissions**:
    - In the `GeminiKeyboard` target settings, under `Info`, ensure `RequestsOpenAccess` is set to `YES`.
    - Add the `NSMicrophoneUsageDescription` key to your main App's `Info.plist`.
-5. **Add API Key**:
-   - Open `GeminiClient.swift` and replace `YOUR_GEMINI_API_KEY` with your actual Gemini API key.
 
-## Important Note
-For the microphone to work in a Keyboard Extension:
-- You **must** enable "Allow Full Access" in the iOS Keyboard Settings for this keyboard.
-- The containing app must also have microphone permissions.
+5. **App Groups (Shared Recording Settings)**:
+   - For the keyboard to read the API key you enter in the main app, you **must** set up an App Group.
+   - Go to the **Signing & Capabilities** tab for BOTH the `GeminiDictate` app and the `GeminiKeyboard` targets.
+   - Click **+ Capability** and add **App Groups**.
+   - Create a new group (e.g., `group.com.yourcompany.GeminiDictate`).
+   - Open `SettingsManager.swift` and update `appGroupId` with your new group ID.
+
+## 🔑 API Key Management
+The app no longer stores the API key in the code.
+1. Launch the `GeminiDictate` app on your iPhone.
+2. Enter your Gemini API key in the input field.
+3. This key is saved to your device's memory and shared with the keyboard extension automatically.
